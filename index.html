@@ -24,14 +24,75 @@ button{border:0;border-radius:8px;padding:12px 16px;font-weight:700;cursor:point
 .warning{background:#b85c00;color:#fff}
 button:disabled{opacity:.45;cursor:not-allowed}
 .preview{border:1px dashed #aeb7c0;border-radius:12px;padding:18px;text-align:center;min-height:390px;display:flex;flex-direction:column;align-items:center;justify-content:center}
-#qrcode{min-height:280px;display:flex;align-items:center;justify-content:center;background:#fff;position:relative;padding:10px}
+#qrcode{min-height:280px;display:flex;align-items:center;justify-content:center;background:#fff;padding:10px}
 #qrcode svg{width:min(290px,100%);height:auto;image-rendering:pixelated}
-.provider-name{font-size:18px;font-weight:700;color:#1467a5;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px}
 .small{font-size:13px;color:#69727b;line-height:1.45}
 .security-note{background:#f7f9fb;padding:10px;border-radius:8px;margin-top:14px;font-size:13px;color:#56606a}
 .download-section{margin-top:16px;width:100%}
 .download-section .buttons{justify-content:center;margin-top:10px}
 .info-footer{margin-top:10px;font-size:12px;color:#69727b;text-align:center;border-top:1px solid #e8edf2;padding-top:8px}
+
+/* Cartão de exportação (para download) */
+.export-card {
+  background: #fff;
+  border: 2px dashed #1467a5;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: center;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.export-card .logo-corner {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 8px;
+}
+.export-card .logo-corner img {
+  max-height: 50px;
+  max-width: 120px;
+  object-fit: contain;
+}
+.export-card .provider-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1467a5;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin: 4px 0 12px 0;
+}
+.export-card .ssid-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #20242a;
+  margin-bottom: 16px;
+}
+.export-card .qr-container {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0;
+}
+.export-card .qr-container svg {
+  width: 260px;
+  height: 260px;
+}
+.export-card .footer-info {
+  font-size: 13px;
+  color: #56606a;
+  border-top: 1px solid #e8edf2;
+  padding-top: 12px;
+  margin-top: 16px;
+}
+.export-card .footer-info strong {
+  color: #20242a;
+}
+.export-card .instruction {
+  font-size: 12px;
+  color: #69727b;
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
 @media(max-width:720px){
   .grid{grid-template-columns:1fr}
   .card{padding:18px}
@@ -42,13 +103,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
 @media print{
   body{background:#fff}
   .wrap{margin:0;max-width:none}
-  .card{box-shadow:none;padding:0}
+  .card{box-shadow:none;padding:0;border:0}
   .form,.sub,.buttons,.security-note,.small,.download-section,.info-footer{display:none!important}
   .grid{display:block}
   .preview{border:0;min-height:0;padding:0}
-  .provider-name{display:block!important;font-size:16px;margin-bottom:5px}
-  #qrcode svg{width:70mm}
-  #qrcode{padding:0}
+  .export-card{border:0;padding:0;max-width:none}
+  .export-card .qr-container svg{width:70mm;height:70mm}
 }
 </style>
 </head>
@@ -94,10 +154,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
       </section>
       
       <section class="preview">
-        <div class="provider-name" id="providerDisplay">FyberNet</div>
-        <h2 id="title">QR Code Wi-Fi</h2>
-        <div id="qrcode">
-          <span class="small">Preencha o SSID e clique em “Gerar QR Code”.</span>
+        <div id="previewContainer">
+          <div class="provider-name" id="providerDisplay">FyberNet</div>
+          <h2 id="title">QR Code Wi-Fi</h2>
+          <div id="qrcode">
+            <span class="small">Preencha o SSID e clique em “Gerar QR Code”.</span>
+          </div>
         </div>
         
         <div class="download-section">
@@ -119,17 +181,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </div>
 
 <script>
-// ==================== BIBLIOTECA QR CODE (MANTIDA) ====================
+// ==================== BIBLIOTECA QR CODE (COMPLETA) ====================
 var QRMath = {
-    glog : function(n) {
-        if (n < 1) { throw new Error("glog(" + n + ")"); }
-        return QRMath.LOG_TABLE[n];
-    },
-    gexp : function(n) {
-        while (n < 0) { n += 255; }
-        while (n >= 256) { n -= 255; }
-        return QRMath.EXP_TABLE[n];
-    },
+    glog : function(n) { if (n < 1) { throw new Error("glog(" + n + ")"); } return QRMath.LOG_TABLE[n]; },
+    gexp : function(n) { while (n < 0) { n += 255; } while (n >= 256) { n -= 255; } return QRMath.EXP_TABLE[n]; },
     EXP_TABLE : new Array(256),
     LOG_TABLE : new Array(256)
 };
@@ -628,11 +683,12 @@ function wifiPayload() {
     return `WIFI:T:${t};S:${escWifi(s)};P:${escWifi(t === 'nopass' ? '' : p)};H:${h ? 'true' : 'false'};;`;
 }
 
-// Gera o SVG puro (sem logo) para download
-function makeSvg(qr, scale = 8, quiet = 4) {
+// Gera apenas o SVG do QR Code (sem cartão)
+function makeQrSvg(qr, scale = 8, quiet = 4) {
     const n = qr.getModuleCount();
     const size = (n + quiet * 2) * scale;
-    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"/>`;
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges">`;
+    s += `<rect width="100%" height="100%" fill="#fff"/>`;
     for (let r = 0; r < n; r++) {
         for (let c = 0; c < n; c++) {
             if (qr.isDark(r, c)) {
@@ -643,34 +699,99 @@ function makeSvg(qr, scale = 8, quiet = 4) {
     return s + '</svg>';
 }
 
-// Gera o SVG final com o logo (se houver) para exibição e download
-function makeSvgWithLogo(qr, logoDataUrl, scale = 8, quiet = 4) {
+// Gera o cartão completo (SVG) com logo no canto, nome do provedor, SSID, QR Code e rodapé
+function makeExportCardSvg(qr, logoDataUrl, providerName, ssidName) {
     const n = qr.getModuleCount();
-    const size = (n + quiet * 2) * scale;
-    let svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges">`;
-    svg += `<rect width="100%" height="100%" fill="#fff"/>`;
+    const qrScale = 8;
+    const quiet = 4;
+    const qrSize = (n + quiet * 2) * qrScale;
+
+    // Dimensões do cartão
+    const cardWidth = 480;
+    const cardPadding = 24;
+    const logoHeight = 50;
+    const providerFontSize = 20;
+    const ssidFontSize = 18;
+    const footerFontSize = 12;
+    const instructionFontSize = 11;
+
+    // Calcular altura total dinamicamente
+    let y = cardPadding;
+    const logoY = y;
+    y += logoHeight + 12; // espaço após logo
+    const providerY = y;
+    y += providerFontSize + 8;
+    const ssidY = y;
+    y += ssidFontSize + 16;
+    const qrY = y;
+    y += qrSize + 16;
+    const footerY = y;
+    y += footerFontSize + 8;
+    const instructionY = y;
+    y += instructionFontSize + 4;
+    const cardHeight = y + cardPadding;
+
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}">`;
+    // Fundo do cartão
+    svg += `<rect width="${cardWidth}" height="${cardHeight}" fill="#ffffff" rx="16" ry="16"/>`;
+    // Borda tracejada
+    svg += `<rect x="1" y="1" width="${cardWidth - 2}" height="${cardHeight - 2}" fill="none" stroke="#1467a5" stroke-width="2" stroke-dasharray="8 4" rx="15" ry="15"/>`;
+
+    // Logo no canto superior esquerdo
+    if (logoDataUrl) {
+        const logoX = cardPadding;
+        svg += `<image x="${logoX}" y="${logoY}" height="${logoHeight}" xlink:href="${logoDataUrl}" preserveAspectRatio="xMinYMin meet"/>`;
+    }
+
+    // Nome do provedor (centralizado)
+    const centerX = cardWidth / 2;
+    svg += `<text x="${centerX}" y="${providerY + providerFontSize}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${providerFontSize}" font-weight="bold" fill="#1467a5" letter-spacing="2">${escapeXml(providerName.toUpperCase())}</text>`;
+
+    // Nome da rede (SSID)
+    svg += `<text x="${centerX}" y="${ssidY + ssidFontSize}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${ssidFontSize}" font-weight="bold" fill="#20242a">${escapeXml(ssidName)}</text>`;
+
+    // QR Code centralizado
+    const qrX = (cardWidth - qrSize) / 2;
+    svg += `<g transform="translate(${qrX}, ${qrY})">`;
+    svg += `<rect width="${qrSize}" height="${qrSize}" fill="#ffffff"/>`;
     for (let r = 0; r < n; r++) {
         for (let c = 0; c < n; c++) {
             if (qr.isDark(r, c)) {
-                svg += `<rect x="${(c + quiet) * scale}" y="${(r + quiet) * scale}" width="${scale}" height="${scale}" fill="#000"/>`;
+                svg += `<rect x="${(c + quiet) * qrScale}" y="${(r + quiet) * qrScale}" width="${qrScale}" height="${qrScale}" fill="#000000"/>`;
             }
         }
     }
-    if (logoDataUrl) {
-        const logoSize = size * 0.18; // 18% do tamanho total
-        const logoX = (size - logoSize) / 2;
-        const logoY = (size - logoSize) / 2;
-        // Fundo branco atrás da logo para melhor contraste
-        svg += `<rect x="${logoX - 2}" y="${logoY - 2}" width="${logoSize + 4}" height="${logoSize + 4}" fill="#fff" rx="4"/>`;
-        svg += `<image x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" xlink:href="${logoDataUrl}" preserveAspectRatio="xMidYMid meet"/>`;
-    }
+    svg += `</g>`;
+
+    // Linha separadora
+    svg += `<line x1="${cardPadding}" y1="${footerY - 8}" x2="${cardWidth - cardPadding}" y2="${footerY - 8}" stroke="#e8edf2" stroke-width="1"/>`;
+
+    // Rodapé com informações
+    svg += `<text x="${centerX}" y="${footerY + footerFontSize}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${footerFontSize}" fill="#56606a">Rede: <tspan font-weight="bold" fill="#20242a">${escapeXml(ssidName)}</tspan> | Provedor: <tspan font-weight="bold" fill="#20242a">${escapeXml(providerName)}</tspan></text>`;
+
+    // Instrução
+    svg += `<text x="${centerX}" y="${instructionY + instructionFontSize}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${instructionFontSize}" fill="#69727b">Depois de ler o código, o celular normalmente exibirá a opção de conectar à rede.</text>`;
+
     svg += '</svg>';
     return svg;
 }
 
-let currentSvg = '';
+function escapeXml(unsafe) {
+    return String(unsafe).replace(/[<>&'"]/g, function (c) {
+        switch (c) {
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '&': return '&amp;';
+            case '\'': return '&apos;';
+            case '"': return '&quot;';
+        }
+    });
+}
+
 let currentQr = null;
 let currentLogoDataUrl = null;
+let currentProvider = 'FyberNet';
+let currentSsid = '';
 
 // Elementos do DOM
 const providerInput = document.getElementById('provider');
@@ -695,9 +816,7 @@ logoInput.addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (!file) { currentLogoDataUrl = null; return; }
     const reader = new FileReader();
-    reader.onload = function(ev) {
-        currentLogoDataUrl = ev.target.result;
-    };
+    reader.onload = function(ev) { currentLogoDataUrl = ev.target.result; };
     reader.readAsDataURL(file);
 });
 
@@ -713,7 +832,6 @@ function updateFooter() {
     const provider = providerInput.value.trim() || 'FyberNet';
     infoFooter.textContent = `Rede: ${ssid} | Provedor: ${provider}`;
 }
-
 ssidInput.addEventListener('input', updateFooter);
 
 // Gerar QR Code
@@ -727,16 +845,17 @@ generateBtn.onclick = () => {
         qr.make();
 
         currentQr = qr;
-        currentSvg = makeSvgWithLogo(qr, currentLogoDataUrl);
-        qrcodeDiv.innerHTML = currentSvg;
+        currentProvider = providerInput.value.trim() || 'FyberNet';
+        currentSsid = ssidInput.value.trim();
 
-        const ssid = ssidInput.value.trim();
-        const provider = providerInput.value.trim() || 'FyberNet';
-        titleEl.textContent = ssid;
-        providerDisplay.textContent = provider;
+        // Exibir apenas o QR Code na pré-visualização (sem cartão)
+        const qrSvg = makeQrSvg(qr);
+        qrcodeDiv.innerHTML = qrSvg;
+
+        titleEl.textContent = currentSsid;
+        providerDisplay.textContent = currentProvider;
         updateFooter();
 
-        // Habilitar botões
         downloadSvgBtn.disabled = false;
         downloadPngBtn.disabled = false;
         downloadJpgBtn.disabled = false;
@@ -747,10 +866,11 @@ generateBtn.onclick = () => {
     }
 };
 
-// Download SVG
+// Download SVG (cartão completo)
 downloadSvgBtn.onclick = () => {
-    if (!currentSvg) return;
-    const blob = new Blob([currentSvg], { type: 'image/svg+xml;charset=utf-8' });
+    if (!currentQr) return;
+    const cardSvg = makeExportCardSvg(currentQr, currentLogoDataUrl, currentProvider, currentSsid);
+    const blob = new Blob([cardSvg], { type: 'image/svg+xml;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'qrcode-wifi.svg';
@@ -758,25 +878,25 @@ downloadSvgBtn.onclick = () => {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
 
-// Função para converter SVG em Canvas e baixar como PNG ou JPG
+// Função para converter o cartão SVG em imagem (PNG/JPG)
 function downloadAsImage(format) {
-    if (!currentSvg) return;
-    const svgString = currentSvg;
-    const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    if (!currentQr) return;
+    const cardSvg = makeExportCardSvg(currentQr, currentLogoDataUrl, currentProvider, currentSsid);
+    const svgBlob = new Blob([cardSvg], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
     const img = new Image();
     img.onload = function() {
         const canvas = document.createElement('canvas');
-        const size = 800; // Tamanho fixo para alta resolução
-        canvas.width = size;
-        canvas.height = size;
+        const scale = 2; // Alta resolução
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
         const ctx = canvas.getContext('2d');
-        // Fundo branco para JPG
+        ctx.scale(scale, scale);
         if (format === 'jpg') {
             ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, size, size);
+            ctx.fillRect(0, 0, img.width, img.height);
         }
-        ctx.drawImage(img, 0, 0, size, size);
+        ctx.drawImage(img, 0, 0);
         URL.revokeObjectURL(url);
 
         const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
@@ -795,7 +915,29 @@ function downloadAsImage(format) {
 downloadPngBtn.onclick = () => downloadAsImage('png');
 downloadJpgBtn.onclick = () => downloadAsImage('jpg');
 
-printBtn.onclick = () => window.print();
+// Impressão: substitui o conteúdo da pré-visualização pelo cartão completo e imprime
+printBtn.onclick = () => {
+    if (!currentQr) return;
+    const cardSvg = makeExportCardSvg(currentQr, currentLogoDataUrl, currentProvider, currentSsid);
+    // Criar uma janela de impressão
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Imprimir QR Code Wi-Fi</title>
+            <style>
+                body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #fff; }
+                svg { max-width: 100%; height: auto; }
+                @media print { body { margin: 0; } }
+            </style>
+        </head>
+        <body>${cardSvg}</body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); }, 500);
+};
 
 clearBtn.onclick = () => {
     ssidInput.value = '';
@@ -812,11 +954,9 @@ clearBtn.onclick = () => {
     titleEl.textContent = 'QR Code Wi-Fi';
     providerDisplay.textContent = providerInput.value.trim() || 'FyberNet';
     updateFooter();
-    currentSvg = '';
     currentQr = null;
 };
 
-// Inicializar footer
 updateFooter();
 </script>
 </body>
